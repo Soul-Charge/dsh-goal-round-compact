@@ -1,0 +1,36 @@
+{
+  "name": "dsh-goal-round-compact",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Compact the conversation at every goal-round boundary so long autonomous goals never accumulate unbounded context.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "dsh": ">=0.0.1",
+    "node": ">=20.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "files": [
+    "src",
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "license": "MIT"
+}

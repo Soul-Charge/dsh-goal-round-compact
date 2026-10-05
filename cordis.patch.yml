@@ -1,0 +1,65 @@
+# dsh-goal-round-compact bundle layer.
+#
+# Host-plane only. It registers NO model-visible tool, NO prompt section and NO
+# client UI, so it costs 0 tokens and cannot alter the tool catalog (which would
+# invalidate the request prefix and the provider KV cache on every session).
+#
+# It injects only 'goals': the goal service is host-plane in the web profile
+# (dsh-web-app keeps the goal service and round driver on the host while moving
+# the agent-plane rows behind presets). The compaction SERVICE is deliberately
+# NOT injected — dsh-web-app disables the host 'compaction-basic' row and each
+# preset mounts its own copy inside an isolated realm, so a host injection would
+# pend forever. The service is resolved per agent through agent.ctx instead, and
+# tokenMeter is resolved through ctx.get for the same load-robustness reason.
+#
+# 'settings' is deliberately NOT in the plugin's static inject either. A static
+# inject entry is a HARD dependency in cordis (cordis/src/registry.ts:105-106,
+# cordis/src/fiber.ts:611-637): with no settings service the fiber never leaves
+# PENDING and apply() is never called. The settings namespace is wired through
+# the optional ctx.inject(['settings'], …) inside src/settings.js instead, so a
+# profile without dsh-settings still loads this plugin and simply reads the
+# numbers below.
+#
+# ── 这一层与设置页的关系 ─────────────────────────────────────────────────
+# The five numbers below are the BASE layer of the 'goal-round-compact'
+# settings namespace. A second layer lives in $DSH_HOME/settings.yaml under the
+# same name and is what the Settings page writes; dsh-settings folds user over
+# base. applies defaults to 'live', so a change made in the UI takes effect on
+# the next agent step with no restart.
+#
+# ⚠️ These five numbers are a MIRROR of DEFAULT_SETTINGS in src/settings.js,
+# which is the single source of truth (a YAML file cannot import JS). If you
+# change one side, change the other; the task report ships a check that asserts
+# they agree. Keep them identical unless you deliberately want the bundle to
+# diverge from the schema defaults.
+#
+# ⚠️ retainTokens is an ABSOLUTE token count and does NOT scale with the model's
+# contextWindow. Unlike dsh-compaction-basic's ratio-based defaults, copying
+# this number onto a small-window model can make the retained tail exceed the
+# compaction threshold. Add a modelPolicies entry for that model instead.
+#
+# modelPolicies is a host-side capability and is intentionally NOT rendered by
+# the first version of the settings card. It can still be set here, or in
+# settings.yaml:
+#
+#     modelPolicies:
+#       - provider: workbuddy-subscription
+#         model: deepseek-v4.1-flash
+#         retainTokens: 8000
+#
+# Matching is strict equality on the exact (provider, model) pair, first hit
+# wins, and every field it omits falls back to the global value. Wildcards do
+# NOT work — a model written as 'deepseek*' never matches and fails silently.
+- insert:
+    - id: goal-round-compact
+      name: dsh-goal-round-compact
+      config:
+        enabled: true
+        # 低于此总量不压缩（避免起步阶段白烧一次模型调用）。
+        minTokensBeforeCompact: 48000
+        # 逐字保留的近期尾部预算。绝对 token 数，不随 contextWindow 缩放。
+        retainTokens: 16000
+        # 上次压缩后至少再增长这么多 token，才允许压第二次。
+        minGrowthTokens: 32000
+        # 同一 goal 内最多压缩几次。
+        maxCompactionsPerGoal: 8

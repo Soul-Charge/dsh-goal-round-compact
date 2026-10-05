@@ -1,0 +1,26 @@
+# dsh-goal-round-compact bundle layer.
+#
+# Host-plane only. It registers NO model-visible tool, NO prompt section and NO
+# client UI, so it costs 0 tokens and cannot alter the tool catalog (which would
+# invalidate the request prefix and the provider KV cache on every session).
+#
+# It injects only 'goals': the goal service is host-plane in the web profile
+# (dsh-web-app keeps the goal service and round driver on the host while moving
+# the agent-plane rows behind presets). The compaction SERVICE is deliberately
+# NOT injected — dsh-web-app disables the host 'compaction-basic' row and each
+# preset mounts its own copy inside an isolated realm, so a host injection would
+# pend forever. The service is resolved per agent through agent.ctx instead, and
+# tokenMeter is resolved through ctx.get for the same load-robustness reason.
+- insert:
+    - id: goal-round-compact
+      name: dsh-goal-round-compact
+      config:
+        enabled: true
+        # 低于此总量不压缩（避免起步阶段白烧一次模型调用）。
+        minTokensBeforeCompact: 48000
+        # 逐字保留的近期尾部预算。
+        retainTokens: 16000
+        # 上次压缩后至少再增长这么多 token，才允许压第二次。
+        minGrowthTokens: 32000
+        # 同一 goal 内最多压缩几次。
+        maxCompactionsPerGoal: 8
